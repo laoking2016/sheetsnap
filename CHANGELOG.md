@@ -4,3 +4,6 @@
 ## 2026-06-15
 - feat: 阶段 0 项目脚手架
 
+
+## 2026-06-15
+- feat: add changelog update skill
