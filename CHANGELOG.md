@@ -7,3 +7,6 @@
 
 ## 2026-06-15
 - feat: add changelog update skill
+
+## 2026-06-15
+- docs: update CHANGELOG.md to include skill commit
