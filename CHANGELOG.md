@@ -17,3 +17,6 @@
 ## 2026-06-15
 - docs: update CHANGELOG.md
 - docs: mark stage 1 as completed in roadmap
+
+## 2026-06-15
+- feat: 阶段 2 错误处理 + 用户提示
