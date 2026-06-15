@@ -187,7 +187,7 @@ function parseCsvLine(line: string): string[] {
  * Mock parser for development / fallback.
  * Creates sample data to test the pipeline end-to-end.
  */
-function mockParse(_buffer: Buffer, _fileName: string): ParseResult | null {
+function mockParse(_buffer: Buffer, _fileName?: string): ParseResult | null {
   // Excel/PDF — produce sample data to test the pipeline
   return {
     headers: ['Product Name', 'Spec', 'Unit Price', 'MOQ', 'Currency'],

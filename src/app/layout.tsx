@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { SessionProvider } from '@/components/session-provider';
+import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/sonner';
 import './globals.css';
 
@@ -18,7 +19,9 @@ export default function RootLayout({
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col font-sans">
         <SessionProvider>
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
           <Toaster />
         </SessionProvider>
       </body>

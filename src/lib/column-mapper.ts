@@ -127,8 +127,19 @@ export function mapColumns(
     }
   }
 
+  // ── Warnings for unmapped columns ──
+  for (let i = 0; i < headers.length; i++) {
+    if (!Object.values(columnIndices).includes(i)) {
+      warnings.push({
+        row: 0,
+        column: headers[i],
+        message: `Column "${headers[i]}" was not mapped to any standard column. Data preserved in "其他信息".`,
+      });
+    }
+  }
+
   // ── Transform rows ──
-  const mappedRows = rows.map((row) => {
+  const mappedRows = rows.map((row, rowIdx) => {
     const mapped: Record<string, string> = {};
 
     for (const col of STANDARD_COLUMNS) {
@@ -142,6 +153,16 @@ export function mapColumns(
     mapped['单价'] = getValue(columnIndices.unitPrice);
     mapped['最小起订量'] = getValue(columnIndices.moq);
     mapped['货币'] = getValue(columnIndices.currency);
+
+    // ── Warning: unparseable price ──
+    const priceStr = mapped['单价'];
+    if (priceStr && isNaN(Number(priceStr.replace(/[$,€£¥]/g, '')))) {
+      warnings.push({
+        row: rowIdx,
+        column: '单价',
+        message: `Unable to parse price value: "${priceStr}".`,
+      });
+    }
 
     // Collect other values as "其他信息"
     const other: string[] = [];

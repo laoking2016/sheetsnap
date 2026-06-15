@@ -13,3 +13,7 @@
 
 ## 2026-06-15
 - feat: 阶段 1 核心链路 — 上传 + 解析 → CSV
+
+## 2026-06-15
+- docs: update CHANGELOG.md
+- docs: mark stage 1 as completed in roadmap

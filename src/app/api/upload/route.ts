@@ -55,9 +55,18 @@ export async function POST(request: NextRequest) {
 
     // ── Size check ──
     if (file.size > MAX_SIZE) {
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
       return NextResponse.json(
-        { success: false, error: 'File size must not exceed 10 MB.' },
+        { success: false, error: `File size must not exceed 10 MB. Your file is ${sizeMB} MB.` },
         { status: 400 },
+      );
+    }
+
+    // ── Empty file check ──
+    if (file.size === 0) {
+      return NextResponse.json(
+        { success: false, error: 'The file is empty. Please check the file content.' },
+        { status: 422 },
       );
     }
 
