@@ -23,8 +23,8 @@ const UNIT_MAP: Record<string, RegExp[]> = {
 };
 
 /**
- * Identify and normalize the "spec" column (which often contains unit info).
- * Also checks "其他信息" column.
+ * Identify and normalize the "Specification" column (which often contains unit info).
+ * Also checks "Other Info" column.
  */
 export function normalizeUnits(
   mappedRows: Record<string, string>[],
@@ -33,19 +33,19 @@ export function normalizeUnits(
   const rows = mappedRows.map((row) => {
     const newRow = { ...row };
 
-    // Try to normalize in "规格" column
-    const spec = newRow['规格'];
+    // Try to normalize in "Specification" column
+    const spec = newRow['Specification'];
     const normalizedSpec = normalizeUnitInString(spec);
     if (normalizedSpec !== spec) {
-      newRow['规格'] = normalizedSpec;
+      newRow['Specification'] = normalizedSpec;
     }
 
-    // Try to normalize in "其他信息" column (in case unit is stored there)
-    const other = newRow['其他信息'];
+    // Try to normalize in "Other Info" column (in case unit is stored there)
+    const other = newRow['Other Info'];
     if (other) {
       const normalizedOther = normalizeUnitInString(other);
       if (normalizedOther !== other) {
-        newRow['其他信息'] = normalizedOther;
+        newRow['Other Info'] = normalizedOther;
       }
     }
 

@@ -15,12 +15,12 @@ export interface ColumnMappingResult {
  * Standard output columns
  */
 const STANDARD_COLUMNS = [
-  '产品名称',
-  '规格',
-  '单价',
-  '最小起订量',
-  '货币',
-  '其他信息',
+  'Product Name',
+  'Specification',
+  'Unit Price',
+  'MOQ',
+  'Currency',
+  'Other Info',
 ] as const;
 
 /**
@@ -29,7 +29,7 @@ const STANDARD_COLUMNS = [
  */
 const COLUMN_PATTERNS: { target: string; patterns: RegExp[] }[] = [
   {
-    target: '产品名称',
+    target: 'Product Name',
     patterns: [
       /product\s*name/i,
       /产品名称/i,
@@ -43,7 +43,7 @@ const COLUMN_PATTERNS: { target: string; patterns: RegExp[] }[] = [
     ],
   },
   {
-    target: '规格',
+    target: 'Specification',
     patterns: [
       /规格/i,
       /spec/i,
@@ -56,7 +56,7 @@ const COLUMN_PATTERNS: { target: string; patterns: RegExp[] }[] = [
     ],
   },
   {
-    target: '单价',
+    target: 'Unit Price',
     patterns: [
       /unit\s*price/i,
       /单价/i,
@@ -66,7 +66,7 @@ const COLUMN_PATTERNS: { target: string; patterns: RegExp[] }[] = [
     ],
   },
   {
-    target: '最小起订量',
+    target: 'MOQ',
     patterns: [
       /moq/i,
       /min\s*order/i,
@@ -81,7 +81,7 @@ const COLUMN_PATTERNS: { target: string; patterns: RegExp[] }[] = [
     ],
   },
   {
-    target: '货币',
+    target: 'Currency',
     patterns: [
       /currency/i,
       /货币/i,
@@ -133,7 +133,7 @@ export function mapColumns(
       warnings.push({
         row: 0,
         column: headers[i],
-        message: `Column "${headers[i]}" was not mapped to any standard column. Data preserved in "其他信息".`,
+        message: `Column "${headers[i]}" was not mapped to any standard column. Data preserved in "Other Info".`,
       });
     }
   }
@@ -148,30 +148,30 @@ export function mapColumns(
 
     // Extract standard columns
     const getValue = (idx: number) => (idx >= 0 && idx < row.length ? row[idx].trim() : '');
-    mapped['产品名称'] = getValue(columnIndices.productName);
-    mapped['规格'] = getValue(columnIndices.spec);
-    mapped['单价'] = getValue(columnIndices.unitPrice);
-    mapped['最小起订量'] = getValue(columnIndices.moq);
-    mapped['货币'] = getValue(columnIndices.currency);
+    mapped['Product Name'] = getValue(columnIndices.productName);
+    mapped['Specification'] = getValue(columnIndices.spec);
+    mapped['Unit Price'] = getValue(columnIndices.unitPrice);
+    mapped['MOQ'] = getValue(columnIndices.moq);
+    mapped['Currency'] = getValue(columnIndices.currency);
 
     // ── Warning: unparseable price ──
-    const priceStr = mapped['单价'];
+    const priceStr = mapped['Unit Price'];
     if (priceStr && isNaN(Number(priceStr.replace(/[$,€£¥]/g, '')))) {
       warnings.push({
         row: rowIdx,
-        column: '单价',
+        column: 'Unit Price',
         message: `Unable to parse price value: "${priceStr}".`,
       });
     }
 
-    // Collect other values as "其他信息"
+    // Collect other values as "Other Info"
     const other: string[] = [];
     for (let i = 0; i < row.length; i++) {
       if (!Object.values(columnIndices).includes(i) && row[i].trim()) {
         other.push(`${headers[i]}: ${row[i].trim()}`);
       }
     }
-    mapped['其他信息'] = other.join('; ');
+    mapped['Other Info'] = other.join('; ');
 
     return mapped;
   });
@@ -185,11 +185,11 @@ export function mapColumns(
 
 function getColumnKey(target: string): string | null {
   const map: Record<string, string> = {
-    '产品名称': 'productName',
-    '规格': 'spec',
-    '单价': 'unitPrice',
-    '最小起订量': 'moq',
-    '货币': 'currency',
+    'Product Name': 'productName',
+    'Specification': 'spec',
+    'Unit Price': 'unitPrice',
+    'MOQ': 'moq',
+    'Currency': 'currency',
   };
   return map[target] || null;
 }

@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
     // ── Response ──
     return NextResponse.json({
       success: true,
-      columns: ['产品名称', '规格', '单价', '最小起订量', '货币', '其他信息'],
+      columns: ['Product Name', 'Specification', 'Unit Price', 'MOQ', 'Currency', 'Other Info'],
       rows,
       warnings,
       csv,
