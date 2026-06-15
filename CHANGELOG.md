@@ -10,3 +10,6 @@
 
 ## 2026-06-15
 - docs: update CHANGELOG.md to include skill commit
+
+## 2026-06-15
+- feat: 阶段 1 核心链路 — 上传 + 解析 → CSV
