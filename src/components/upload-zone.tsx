@@ -7,6 +7,14 @@ import { Button } from '@/components/ui/button';
 import { GuestEmailDialog } from '@/components/guest-email-dialog';
 import { getGuestId } from '@/lib/guest-id';
 
+function track(event: string, metadata?: Record<string, unknown>) {
+  fetch('/api/analytics', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event, metadata }),
+  }).catch(() => {});
+}
+
 interface UploadZoneProps {
   isLoggedIn: boolean;
 }
@@ -60,6 +68,7 @@ export function UploadZone({ isLoggedIn }: UploadZoneProps) {
 
       setFileName(file.name);
       setStage('uploading');
+      track('upload_started', { fileName: file.name, fileSize: file.size });
 
       if (!isLoggedIn) {
         getGuestId();
@@ -81,17 +90,20 @@ export function UploadZone({ isLoggedIn }: UploadZoneProps) {
         if (!data.success) {
           setStage('error');
           setErrorMsg(data.error || 'Failed to parse the file.');
+          track('parse_failed', { error: data.error });
           return;
         }
 
         if (!data.rows || data.rows.length === 0) {
           setStage('error');
           setErrorMsg('No data found in the file. Please check the file content.');
+          track('parse_failed', { reason: 'empty_result' });
           return;
         }
 
         setResult(data);
         setStage('preview');
+        track('parse_success', { rows: data.rows.length, warnings: data.warnings?.length || 0 });
 
         if (data.warnings && data.warnings.length > 0) {
           data.warnings.forEach((w) => toast.warning(w.message));
@@ -164,6 +176,7 @@ export function UploadZone({ isLoggedIn }: UploadZoneProps) {
     a.download = `${baseName}_sheetsnap.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    track('csv_downloaded', { fileName });
   };
 
   const handleReset = () => {

@@ -20,3 +20,11 @@
 
 ## 2026-06-15
 - feat: 阶段 2 错误处理 + 用户提示
+
+## 2026-06-15
+- docs: mark stage 2 as completed in roadmap
+- docs: mark stage 3 as completed in roadmap
+- fix: change output column headers from Chinese to English
+
+## 2026-06-18
+- docs: reorder roadmap — do stage 5 (launch) before stage 4 (billing)
