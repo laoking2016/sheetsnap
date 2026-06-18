@@ -220,7 +220,7 @@ export function UploadZone({ isLoggedIn }: UploadZoneProps) {
 
   if (stage === 'preview' && result) {
     return (
-      <div className="flex w-full max-w-3xl flex-col items-center gap-4">
+      <div className="flex w-full max-w-5xl flex-col items-center gap-4">
         {showEmailDialog && !guestEmail ? (
           <GuestEmailDialog onEmailSubmit={handleEmailSubmit} onSkip={handleSkip} />
         ) : (
@@ -244,7 +244,7 @@ export function UploadZone({ isLoggedIn }: UploadZoneProps) {
                           (w) => w.row === i && w.column === col,
                         );
                         return (
-                          <td key={col} className="max-w-[200px] truncate px-3 py-2">
+                          <td key={col} className="truncate px-3 py-2">
                             {hasWarning ? (
                               <span className="inline-flex items-center gap-1" title={val}>
                                 <span className="inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-amber-100 text-[10px] text-amber-700">
