@@ -8,7 +8,7 @@ export interface ParseResult {
  * Parse an uploaded file.
  * - CSV files are parsed locally (no need for AI).
  * - Excel/PDF files are sent to LlamaParse.
- * Falls back to mock data if API is unavailable.
+ * Throws on failure (no silent fallback to mock in production).
  */
 export async function parseFile(
   buffer: Buffer,
@@ -23,47 +23,56 @@ export async function parseFile(
 
   // Excel/PDF: use LlamaParse
   const apiKey = process.env.LLAMA_PARSE_API_KEY;
+  const isDev = process.env.NODE_ENV === 'development';
+
   if (!apiKey) {
-    console.warn('[parse] LLAMA_PARSE_API_KEY not set, using mock');
-    return mockParse(buffer, fileName);
-  }
-
-  try {
-    // Step 1: Upload file to LlamaParse
-    const form = new FormData();
-    const blob = new Blob([new Uint8Array(buffer)]);
-    form.append('file', blob, fileName);
-
-    const uploadRes = await fetch(
-      'https://api.cloud.llamaindex.ai/api/parsing/upload',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: form,
-      },
-    );
-
-    if (!uploadRes.ok) {
-      const text = await uploadRes.text();
-      console.error('[parse] LlamaParse upload failed:', uploadRes.status, text);
+    if (isDev) {
+      console.warn('[parse] LLAMA_PARSE_API_KEY not set, using mock');
       return mockParse(buffer, fileName);
     }
-
-    const uploadData = await uploadRes.json();
-    const jobId = uploadData.id;
-
-    // Step 2: Poll for result
-    const result = await pollResult(apiKey, jobId);
-    if (!result) return mockParse(buffer, fileName);
-
-    // Step 3: Parse markdown table from result
-    return extractTableFromMarkdown(result);
-  } catch (err) {
-    console.error('[parse] LlamaParse error:', err);
-    return mockParse(buffer, fileName);
+    throw new Error('LLAMA_PARSE_API_KEY is not configured.');
   }
+
+  // Step 1: Upload file to LlamaParse
+  const form = new FormData();
+  const blob = new Blob([new Uint8Array(buffer)]);
+  form.append('file', blob, fileName);
+
+  const uploadRes = await fetch(
+    'https://api.cloud.llamaindex.ai/api/parsing/upload',
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+      signal: AbortSignal.timeout(15000), // 15s upload timeout
+    },
+  );
+
+  if (!uploadRes.ok) {
+    const text = await uploadRes.text();
+    console.error('[parse] LlamaParse upload failed:', uploadRes.status, text);
+    if (isDev) {
+      console.warn('[parse] falling back to mock (dev only)');
+      return mockParse(buffer, fileName);
+    }
+    throw new Error(`LlamaParse upload failed: ${uploadRes.status}`);
+  }
+
+  const uploadData = await uploadRes.json();
+  const jobId = uploadData.id;
+
+  // Step 2: Poll for result
+  const result = await pollResult(apiKey, jobId);
+  if (!result) {
+    if (isDev) {
+      console.warn('[parse] falling back to mock (dev only)');
+      return mockParse(buffer, fileName);
+    }
+    throw new Error('LlamaParse processing failed or timed out.');
+  }
+
+  // Step 3: Parse markdown table from result
+  return extractTableFromMarkdown(result);
 }
 
 async function pollResult(
@@ -72,25 +81,30 @@ async function pollResult(
   maxAttempts = 30,
 ): Promise<string | null> {
   for (let i = 0; i < maxAttempts; i++) {
-    const res = await fetch(
-      `https://api.cloud.llamaindex.ai/api/parsing/job/${jobId}`,
-      {
-        headers: { Authorization: `Bearer ${apiKey}` },
-      },
-    );
+    try {
+      const res = await fetch(
+        `https://api.cloud.llamaindex.ai/api/parsing/job/${jobId}`,
+        {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          signal: AbortSignal.timeout(8000), // 8s per poll
+        },
+      );
 
-    if (!res.ok) {
-      console.error('[parse] Poll failed:', res.status);
-      return null;
-    }
+      if (!res.ok) {
+        console.error('[parse] Poll failed:', res.status);
+        return null;
+      }
 
-    const data = await res.json();
-    if (data.status === 'completed') {
-      return data.result?.markdown || data.result?.text || '';
-    }
-    if (data.status === 'failed') {
-      console.error('[parse] Job failed:', data.error);
-      return null;
+      const data = await res.json();
+      if (data.status === 'completed') {
+        return data.result?.markdown || data.result?.text || '';
+      }
+      if (data.status === 'failed') {
+        console.error('[parse] Job failed:', data.error);
+        return null;
+      }
+    } catch {
+      console.error('[parse] Poll attempt', i + 1, 'failed');
     }
 
     // Wait 1 second before retrying

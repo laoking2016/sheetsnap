@@ -110,11 +110,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     console.error('[upload]', err);
+
+    const errorMessage =
+      err instanceof Error && err.message.includes('LlamaParse')
+        ? `${err.message} Please try again or upload a CSV file instead.`
+        : 'Failed to parse the file. Please try again or upload a CSV file.';
+
     return NextResponse.json(
-      {
-        success: false,
-        error: 'An unexpected error occurred. Please try again.',
-      },
+      { success: false, error: errorMessage },
       { status: 500 },
     );
   }
