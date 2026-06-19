@@ -1,3 +1,5 @@
+import LlamaCloud, { type Uploadable } from '@llamaindex/llama-cloud';
+
 export interface ParseResult {
   headers: string[];
   rows: string[][];
@@ -7,116 +9,65 @@ export interface ParseResult {
 /**
  * Parse an uploaded file.
  * - CSV files are parsed locally (no need for AI).
- * - Excel/PDF files are sent to LlamaParse.
- * Throws on failure (no silent fallback to mock in production).
+ * - Excel/PDF files use @llamaindex/llama-cloud SDK with built-in polling.
+ * In development, falls back to mock data if the API is unavailable.
  */
 export async function parseFile(
   buffer: Buffer,
   fileName: string,
 ): Promise<ParseResult | null> {
   const ext = fileName.split('.').pop()?.toLowerCase();
+  const isDev = process.env.NODE_ENV === 'development';
 
   // CSV: parse directly
   if (ext === 'csv') {
     return parseCsv(buffer);
   }
 
-  // Excel/PDF: use LlamaParse
-  const apiKey = process.env.LLAMA_PARSE_API_KEY;
-  const isDev = process.env.NODE_ENV === 'development';
-
-  if (!apiKey) {
+  // Excel/PDF: use LlamaParse SDK
+  // SDK auto-reads LLAMA_PARSE_API_KEY from env
+  if (!process.env.LLAMA_PARSE_API_KEY) {
     if (isDev) {
       console.warn('[parse] LLAMA_PARSE_API_KEY not set, using mock');
-      return mockParse(buffer, fileName);
+      return mockParse();
     }
     throw new Error('LLAMA_PARSE_API_KEY is not configured.');
   }
 
-  // Step 1: Upload file to LlamaParse
-  const form = new FormData();
-  const blob = new Blob([new Uint8Array(buffer)]);
-  form.append('file', blob, fileName);
+  try {
+    const client = new LlamaCloud();
 
-  const uploadRes = await fetch(
-    'https://api.cloud.llamaindex.ai/api/parsing/upload',
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: form,
-      signal: AbortSignal.timeout(15000), // 15s upload timeout
-    },
-  );
-
-  if (!uploadRes.ok) {
-    const text = await uploadRes.text();
-    console.error('[parse] LlamaParse upload failed:', uploadRes.status, text);
-    if (isDev) {
-      console.warn('[parse] falling back to mock (dev only)');
-      return mockParse(buffer, fileName);
-    }
-    throw new Error(`LlamaParse upload failed: ${uploadRes.status}`);
-  }
-
-  const uploadData = await uploadRes.json();
-  const jobId = uploadData.id;
-
-  // Step 2: Poll for result
-  const result = await pollResult(apiKey, jobId);
-  if (!result) {
-    if (isDev) {
-      console.warn('[parse] falling back to mock (dev only)');
-      return mockParse(buffer, fileName);
-    }
-    throw new Error('LlamaParse processing failed or timed out.');
-  }
-
-  // Step 3: Parse markdown table from result
-  return extractTableFromMarkdown(result);
-}
-
-async function pollResult(
-  apiKey: string,
-  jobId: string,
-  maxAttempts = 30,
-): Promise<string | null> {
-  for (let i = 0; i < maxAttempts; i++) {
-    try {
-      const res = await fetch(
-        `https://api.cloud.llamaindex.ai/api/parsing/job/${jobId}`,
-        {
-          headers: { Authorization: `Bearer ${apiKey}` },
-          signal: AbortSignal.timeout(8000), // 8s per poll
+    const result = await client.parsing.parse(
+      {
+        tier: 'cost_effective',
+        version: 'latest',
+        upload_file: new Blob([new Uint8Array(buffer)], { type: 'application/octet-stream' }) as Uploadable,
+        expand: ['markdown_full'],
+        input_options: {
+          spreadsheet: {
+            detect_sub_tables_in_sheets: true,
+            include_hidden_sheets: false,
+          },
         },
-      );
+      },
+      { verbose: false, timeout: 120_000 },
+    );
 
-      if (!res.ok) {
-        console.error('[parse] Poll attempt', i + 1, 'failed with status', res.status);
-        continue; // retry on temporary errors (429, 503, etc.)
-      }
+    const markdown = result.markdown_full || '';
+    if (!markdown) return null;
 
-      const data = await res.json();
-      const status = (data.status || '').toLowerCase();
-
-      if (status === 'completed') {
-        return data.result?.markdown || data.result?.text || '';
-      }
-      if (status === 'failed') {
-        console.error('[parse] Job failed:', data.error || data.error_message);
-        return null;
-      }
-    } catch {
-      console.error('[parse] Poll attempt', i + 1, 'failed');
+    return extractTableFromMarkdown(markdown);
+  } catch (err) {
+    console.error('[parse] LlamaParse error:', err);
+    if (isDev) {
+      console.warn('[parse] falling back to mock (dev only)');
+      return mockParse();
     }
-
-    // Wait 1 second before retrying
-    await new Promise((r) => setTimeout(r, 1000));
+    throw err; // Let the API route surface the error to the user
   }
-  return null;
 }
 
 function extractTableFromMarkdown(markdown: string): ParseResult | null {
-  // Try to find a markdown table (lines containing | and --- separator)
   const lines = markdown.split('\n');
   const tableLines: string[] = [];
   let inTable = false;
@@ -125,12 +76,11 @@ function extractTableFromMarkdown(markdown: string): ParseResult | null {
     const trimmed = line.trim();
     if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
       inTable = true;
-      // Skip separator rows (|---|)
       if (!/^[\s|:-]+$/.test(trimmed.replace(/\|/g, ''))) {
         tableLines.push(trimmed);
       }
     } else if (inTable && trimmed === '') {
-      break; // end of table
+      break;
     }
   }
 
@@ -138,8 +88,6 @@ function extractTableFromMarkdown(markdown: string): ParseResult | null {
 
   const headers = parseRow(tableLines[0]);
   const rows = tableLines.slice(1).map(parseRow);
-
-  // Filter out fully empty rows
   const nonEmptyRows = rows.filter((r) => r.some((cell) => cell.trim() !== ''));
 
   return { headers, rows: nonEmptyRows, raw: markdown };
@@ -148,7 +96,7 @@ function extractTableFromMarkdown(markdown: string): ParseResult | null {
 function parseRow(line: string): string[] {
   return line
     .split('|')
-    .slice(1, -1) // remove leading and trailing empty from split
+    .slice(1, -1)
     .map((cell) => cell.trim());
 }
 
@@ -171,9 +119,6 @@ function parseCsv(buffer: Buffer): ParseResult | null {
   return { headers, rows: nonEmptyRows };
 }
 
-/**
- * Parse a single CSV line, respecting quoted fields.
- */
 function parseCsvLine(line: string): string[] {
   const result: string[] = [];
   let current = '';
@@ -201,10 +146,8 @@ function parseCsvLine(line: string): string[] {
 
 /**
  * Mock parser for development / fallback.
- * Creates sample data to test the pipeline end-to-end.
  */
-function mockParse(_buffer: Buffer, _fileName?: string): ParseResult | null {
-  // Excel/PDF — produce sample data to test the pipeline
+function mockParse(): ParseResult | null {
   return {
     headers: ['Product Name', 'Spec', 'Unit Price', 'MOQ', 'Currency'],
     rows: [
