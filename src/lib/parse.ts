@@ -1,4 +1,4 @@
-import LlamaCloud, { type Uploadable } from '@llamaindex/llama-cloud';
+import LlamaCloud, { toFile } from '@llamaindex/llama-cloud';
 
 export interface ParseResult {
   headers: string[];
@@ -41,7 +41,7 @@ export async function parseFile(
       {
         tier: 'cost_effective',
         version: 'latest',
-        upload_file: new Blob([new Uint8Array(buffer)], { type: 'application/octet-stream' }) as Uploadable,
+        upload_file: await toFile(new Uint8Array(buffer), fileName, { type: 'application/octet-stream' }),
         expand: ['markdown_full'],
         input_options: {
           spreadsheet: {
