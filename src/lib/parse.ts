@@ -91,16 +91,18 @@ async function pollResult(
       );
 
       if (!res.ok) {
-        console.error('[parse] Poll failed:', res.status);
-        return null;
+        console.error('[parse] Poll attempt', i + 1, 'failed with status', res.status);
+        continue; // retry on temporary errors (429, 503, etc.)
       }
 
       const data = await res.json();
-      if (data.status === 'completed') {
+      const status = (data.status || '').toLowerCase();
+
+      if (status === 'completed') {
         return data.result?.markdown || data.result?.text || '';
       }
-      if (data.status === 'failed') {
-        console.error('[parse] Job failed:', data.error);
+      if (status === 'failed') {
+        console.error('[parse] Job failed:', data.error || data.error_message);
         return null;
       }
     } catch {
