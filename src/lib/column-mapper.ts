@@ -19,7 +19,7 @@ const STANDARD_COLUMNS = [
   'unit_price',
   'quantity',
   'currency',
-  'other_info',
+  'amount',
 ] as const;
 
 /**
@@ -128,7 +128,7 @@ export function mapColumns(
       warnings.push({
         row: 0,
         column: headers[i],
-        message: `Column "${headers[i]}" was not mapped. Data preserved in "other_info".`,
+        message: `Column "${headers[i]}" was not mapped.`,
       });
     }
   }
@@ -147,6 +147,7 @@ export function mapColumns(
     mapped['unit_price'] = getValue(columnIndices.unitPrice);
     mapped['quantity'] = getValue(columnIndices.moq);
     mapped['currency'] = getValue(columnIndices.currency);
+    mapped['amount'] = '';
 
     // Warning: unparseable price
     const priceStr = mapped['unit_price'];
@@ -157,15 +158,6 @@ export function mapColumns(
         message: `Unable to parse price value: "${priceStr}".`,
       });
     }
-
-    // Collect other values as "other_info"
-    const other: string[] = [];
-    for (let i = 0; i < row.length; i++) {
-      if (!Object.values(columnIndices).includes(i) && row[i].trim()) {
-        other.push(`${headers[i]}: ${row[i].trim()}`);
-      }
-    }
-    mapped['other_info'] = other.join('; ');
 
     return mapped;
   });

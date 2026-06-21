@@ -197,7 +197,7 @@ function mapExtractResult(
     'unit_price',
     'quantity',
     'currency',
-    'other_info',
+    'amount',
   ];
 
   const rows = details.map((item: unknown) => {
@@ -209,7 +209,7 @@ function mapExtractResult(
       String(row.unit_price ?? ''),
       String(row.quantity ?? ''),
       String(row.currency ?? 'USD'),
-      `unit: ${row.unit || ''}; amount: ${row.amount || ''}`,
+      String(row.amount ?? ''),
     ];
   });
 
@@ -266,10 +266,10 @@ function parseCsvLine(line: string): string[] {
 
 function mockParse(): ParseResult | null {
   return {
-    headers: ['Product Name', 'Specification', 'Unit Price', 'MOQ', 'Currency', 'Other Info'],
+    headers: ['description', 'model', 'unit_price', 'quantity', 'currency', 'amount'],
     rows: [
-      ['LED Bulb 12W', 'E27 220V 6000K', '2.50', '100', 'USD', 'Unit: pcs; Amount: 250.00'],
-      ['LED Bulb 9W', 'E27 220V 4000K', '1.80', '200', 'USD', 'Unit: pcs; Amount: 360.00'],
+      ['LED Bulb 12W', 'E27 220V 6000K', '2.50', '100', 'USD', '250.00'],
+      ['LED Bulb 9W', 'E27 220V 4000K', '1.80', '200', 'USD', '360.00'],
     ],
   };
 }

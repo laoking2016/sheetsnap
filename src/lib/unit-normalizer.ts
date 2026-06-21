@@ -24,7 +24,7 @@ const UNIT_MAP: Record<string, RegExp[]> = {
 
 /**
  * Identify and normalize the "model" column (which often contains unit info).
- * Also checks "other_info" column.
+ * Also checks "amount" column (number format).
  */
 export function normalizeUnits(
   mappedRows: Record<string, string>[],
@@ -38,15 +38,6 @@ export function normalizeUnits(
     const normalizedModel = normalizeUnitInString(model);
     if (normalizedModel !== model) {
       newRow['model'] = normalizedModel;
-    }
-
-    // Try to normalize in "other_info" column
-    const other = newRow['other_info'] || '';
-    if (other) {
-      const normalizedOther = normalizeUnitInString(other);
-      if (normalizedOther !== other) {
-        newRow['other_info'] = normalizedOther;
-      }
     }
 
     return newRow;

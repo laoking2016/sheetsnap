@@ -3,7 +3,7 @@
  * Uses UTF-8 BOM for Excel compatibility.
  */
 export function generateCsv(rows: Record<string, string>[]): string {
-  const columns = ['description', 'model', 'unit_price', 'quantity', 'currency', 'other_info'];
+  const columns = ['description', 'model', 'unit_price', 'quantity', 'currency', 'amount'];
 
   // BOM + header row
   let csv = '\ufeff'; // UTF-8 BOM
