@@ -180,9 +180,10 @@ function mapExtractResult(
 ): ParseResult | null {
   if (!extractResult || typeof extractResult !== 'object') return null;
 
-  // The Extract API returns { product_details: [...] } matching QUOTE_SCHEMA
+  // The Extract API returns [{ product_details: [...] }]
   const obj = extractResult as Record<string, unknown>;
-  const details = obj.product_details as unknown[] | undefined;
+  const firstEntry = obj['0'] as Record<string, unknown> | undefined;
+  const details = firstEntry?.product_details as unknown[] | undefined;
 
   console.log('[mapExtractResult] keys:', Object.keys(obj));
   console.log('[mapExtractResult] product_details isArray:', Array.isArray(details));
