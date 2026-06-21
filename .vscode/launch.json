@@ -1,0 +1,19 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "pnpm dev (调试模式)",
+            "runtimeExecutable": "npx",   // 关键：用 pnpm 代替 node
+            "runtimeArgs": ["pnpm", "dev"],        // pnpm 的参数，即 run dev（等同于 pnpm dev）
+            "cwd": "${workspaceFolder}",   // 确保在项目根目录执行
+            "console": "integratedTerminal", // 输出显示在终端
+            "skipFiles": ["<node_internals>/**"]
+        }
+    ]
+}
