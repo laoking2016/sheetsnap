@@ -151,6 +151,7 @@ export async function parseFile(
     }
 
     // Step 4: Map extracted data to standard rows
+    console.log('[parse] extract_result:', JSON.stringify(job.extract_result).slice(0, 500));
     return mapExtractResult(job.extract_result);
   } catch (err) {
     console.error('[parse] Extract error:', err);
@@ -182,6 +183,10 @@ function mapExtractResult(
   // The Extract API returns { product_details: [...] } matching QUOTE_SCHEMA
   const obj = extractResult as Record<string, unknown>;
   const details = obj.product_details as unknown[] | undefined;
+
+  console.log('[mapExtractResult] keys:', Object.keys(obj));
+  console.log('[mapExtractResult] product_details isArray:', Array.isArray(details));
+  console.log('[mapExtractResult] product_details length:', Array.isArray(details) ? details.length : 'N/A');
 
   if (!Array.isArray(details) || details.length === 0) return null;
 
