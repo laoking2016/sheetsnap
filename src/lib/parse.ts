@@ -175,35 +175,32 @@ export async function parseFile(
 
 /**
  * Map the structured extract result to our standard column format.
+ *
+ * The Extract API returns data matching QUOTE_SCHEMA exactly.
+ * Schema fields:
+ *   description  → Product Name (detailed description incl. specs)
+ *   model        → Specification (model number)
+ *   unit_price   → Unit Price
+ *   quantity     → MOQ (Minimum Order Quantity)
+ *   currency     → Currency
+ *   unit, amount → Other Info
  */
 function mapExtractResult(
   extractResult: unknown,
 ): ParseResult | null {
   if (!extractResult || typeof extractResult !== 'object') return null;
 
-  // extraction_target: 'per_table_row' — result could be an array directly
-  // or a nested object with our schema
-  let details: unknown[] | null = null;
+  // extraction_target: 'per_table_row' returns an array of objects
+  let details: unknown[];
 
   if (Array.isArray(extractResult)) {
     details = extractResult;
   } else {
     const obj = extractResult as Record<string, unknown>;
-    details = obj.product_details as unknown[] | null;
-    if (!Array.isArray(details)) {
-      // Try other common keys
-      const possibleKeys = ['items', 'rows', 'data', 'results'];
-      for (const key of possibleKeys) {
-        const val = obj[key];
-        if (Array.isArray(val) && val.length > 0) {
-          details = val;
-          break;
-        }
-      }
-    }
+    details = (obj.product_details ?? []) as unknown[];
   }
 
-  if (!details || details.length === 0) return null;
+  if (!Array.isArray(details) || details.length === 0) return null;
 
   const headers = [
     'Product Name',
@@ -216,17 +213,16 @@ function mapExtractResult(
 
   const rows = details.map((item: unknown) => {
     const row = item as Record<string, unknown>;
-    const description = String(row.description ?? row.Description ?? row.product_name ?? row.name ?? '');
-    const model = String(row.model ?? row.Model ?? row.spec ?? row.Specification ?? '');
-    const productName = model ? `${description} (${model})` : description;
+    const description = String(row.description ?? '');
+    const model = row.model ? String(row.model) : '';
 
     return [
-      productName,
-      model,
-      String(row.unit_price ?? row.UnitPrice ?? row.price ?? row.Price ?? ''),
-      String(row.quantity ?? row.Quantity ?? row.moq ?? row.MOQ ?? ''),
-      String(row.currency ?? row.Currency ?? 'USD'),
-      `Unit: ${row.unit || row.Unit || ''}; Amount: ${row.amount || row.Amount || ''}`,
+      description,                          // Product Name
+      model,                                // Specification
+      String(row.unit_price ?? ''),         // Unit Price
+      String(row.quantity ?? ''),           // MOQ
+      String(row.currency ?? 'USD'),        // Currency
+      `Unit: ${row.unit || ''}; Amount: ${row.amount || ''}`,  // Other Info
     ];
   });
 
