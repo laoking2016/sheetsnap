@@ -139,7 +139,9 @@ export async function parseFile(
     const terminalStates = ['COMPLETED', 'FAILED', 'CANCELLED'];
     while (!terminalStates.includes(job.status)) {
       await new Promise((r) => setTimeout(r, 1500));
-      job = await client.extract.get(job.id);
+      job = await client.extract.get(job.id, {
+        expand: ['extract_metadata'],
+      });
     }
 
     if (job.status !== 'COMPLETED') {
@@ -147,6 +149,10 @@ export async function parseFile(
         `Extract job ${job.id} failed: ${job.error_message || 'unknown error'}`,
       );
     }
+
+    // Debug: log extract result structure
+    console.log('[parse] extract_result type:', typeof job.extract_result);
+    console.log('[parse] extract_result keys:', job.extract_result ? Object.keys(job.extract_result as object) : 'null');
 
     // Step 4: Map extracted data to standard rows
     return mapExtractResult(job.extract_result);
@@ -168,9 +174,29 @@ function mapExtractResult(
 ): ParseResult | null {
   if (!extractResult || typeof extractResult !== 'object') return null;
 
-  const result = extractResult as Record<string, unknown>;
-  const details = result.product_details;
-  if (!Array.isArray(details) || details.length === 0) return null;
+  // extraction_target: 'per_table_row' — result could be an array directly
+  // or a nested object with our schema
+  let details: unknown[] | null = null;
+
+  if (Array.isArray(extractResult)) {
+    details = extractResult;
+  } else {
+    const obj = extractResult as Record<string, unknown>;
+    details = obj.product_details as unknown[] | null;
+    if (!Array.isArray(details)) {
+      // Try other common keys
+      const possibleKeys = ['items', 'rows', 'data', 'results'];
+      for (const key of possibleKeys) {
+        const val = obj[key];
+        if (Array.isArray(val) && val.length > 0) {
+          details = val;
+          break;
+        }
+      }
+    }
+  }
+
+  if (!details || details.length === 0) return null;
 
   const headers = [
     'Product Name',
@@ -183,20 +209,17 @@ function mapExtractResult(
 
   const rows = details.map((item: unknown) => {
     const row = item as Record<string, unknown>;
-    const description = String(row.description ?? '');
-    const model = row.model ? String(row.model) : '';
-
-    // Combine description and model as product name / spec
+    const description = String(row.description ?? row.Description ?? row.product_name ?? row.name ?? '');
+    const model = String(row.model ?? row.Model ?? row.spec ?? row.Specification ?? '');
     const productName = model ? `${description} (${model})` : description;
-    const spec = model ? description : '';
 
     return [
       productName,
-      spec,
-      String(row.unit_price ?? ''),
-      String(row.quantity ?? ''),
-      String(row.currency ?? ''),
-      `Unit: ${row.unit || ''}; Amount: ${row.amount || ''}`,
+      model,
+      String(row.unit_price ?? row.UnitPrice ?? row.price ?? row.Price ?? ''),
+      String(row.quantity ?? row.Quantity ?? row.moq ?? row.MOQ ?? ''),
+      String(row.currency ?? row.Currency ?? 'USD'),
+      `Unit: ${row.unit || row.Unit || ''}; Amount: ${row.amount || row.Amount || ''}`,
     ];
   });
 
