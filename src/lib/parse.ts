@@ -151,8 +151,15 @@ export async function parseFile(
     }
 
     // Debug: log extract result structure
-    console.log('[parse] extract_result type:', typeof job.extract_result);
-    console.log('[parse] extract_result keys:', job.extract_result ? Object.keys(job.extract_result as object) : 'null');
+    const er = job.extract_result;
+    console.log('[parse] extract_result isArray:', Array.isArray(er));
+    if (er && typeof er === 'object') {
+      console.log('[parse] extract_result keys:', Object.keys(er as object));
+      if (Array.isArray(er) && er.length > 0) {
+        console.log('[parse] first item keys:', Object.keys(er[0] as object));
+        console.log('[parse] first item:', JSON.stringify(er[0], null, 2));
+      }
+    }
 
     // Step 4: Map extracted data to standard rows
     return mapExtractResult(job.extract_result);
