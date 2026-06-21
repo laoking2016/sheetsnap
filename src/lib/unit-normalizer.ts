@@ -23,8 +23,8 @@ const UNIT_MAP: Record<string, RegExp[]> = {
 };
 
 /**
- * Identify and normalize the "Specification" column (which often contains unit info).
- * Also checks "Other Info" column.
+ * Identify and normalize the "model" column (which often contains unit info).
+ * Also checks "other_info" column.
  */
 export function normalizeUnits(
   mappedRows: Record<string, string>[],
@@ -33,19 +33,19 @@ export function normalizeUnits(
   const rows = mappedRows.map((row) => {
     const newRow = { ...row };
 
-    // Try to normalize in "Specification" column
-    const spec = newRow['Specification'];
-    const normalizedSpec = normalizeUnitInString(spec);
-    if (normalizedSpec !== spec) {
-      newRow['Specification'] = normalizedSpec;
+    // Try to normalize in "model" or "description" column
+    const model = newRow['model'] || '';
+    const normalizedModel = normalizeUnitInString(model);
+    if (normalizedModel !== model) {
+      newRow['model'] = normalizedModel;
     }
 
-    // Try to normalize in "Other Info" column (in case unit is stored there)
-    const other = newRow['Other Info'];
+    // Try to normalize in "other_info" column
+    const other = newRow['other_info'] || '';
     if (other) {
       const normalizedOther = normalizeUnitInString(other);
       if (normalizedOther !== other) {
-        newRow['Other Info'] = normalizedOther;
+        newRow['other_info'] = normalizedOther;
       }
     }
 

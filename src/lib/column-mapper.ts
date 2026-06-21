@@ -1,5 +1,4 @@
 export interface ColumnMappingResult {
-  /** Indices into the original rows for each standard column (-1 = not found) */
   columnIndices: {
     productName: number;
     spec: number;
@@ -12,76 +11,73 @@ export interface ColumnMappingResult {
 }
 
 /**
- * Standard output columns
+ * Standard output column names matching QUOTE_SCHEMA.
  */
 const STANDARD_COLUMNS = [
-  'Product Name',
-  'Specification',
-  'Unit Price',
-  'MOQ',
-  'Currency',
-  'Other Info',
+  'description',
+  'model',
+  'unit_price',
+  'quantity',
+  'currency',
+  'other_info',
 ] as const;
 
 /**
  * Keyword patterns for matching input columns to standard columns.
- * Ordered by priority (first match wins).
  */
 const COLUMN_PATTERNS: { target: string; patterns: RegExp[] }[] = [
   {
-    target: 'Product Name',
+    target: 'description',
     patterns: [
+      /description/i,
       /product\s*name/i,
       /产品名称/i,
       /品名/i,
       /item/i,
-      /description/i,
       /产品名/i,
       /物料名称/i,
-      /part\s*name/i,
       /product/i,
+      /name/i,
     ],
   },
   {
-    target: 'Specification',
+    target: 'model',
     patterns: [
-      /规格/i,
+      /model/i,
       /spec/i,
       /specification/i,
+      /规格/i,
       /型号/i,
-      /model/i,
       /尺寸/i,
       /dimension/i,
       /parameter/i,
     ],
   },
   {
-    target: 'Unit Price',
+    target: 'unit_price',
     patterns: [
       /unit\s*price/i,
+      /unitprice/i,
       /单价/i,
       /price/i,
-      /unitprice/i,
       /报价/i,
     ],
   },
   {
-    target: 'MOQ',
+    target: 'quantity',
     patterns: [
+      /quantity/i,
       /moq/i,
       /min\s*order/i,
+      /qty/i,
       /最小起订量/i,
       /minimum\s*order/i,
       /起订量/i,
-      /订货量/i,
-      /min\s*qty/i,
       /order\s*qty/i,
-      /qty/i,
-      /quantity/i,
     ],
   },
   {
-    target: 'Currency',
+    target: 'currency',
     patterns: [
       /currency/i,
       /货币/i,
@@ -92,7 +88,7 @@ const COLUMN_PATTERNS: { target: string; patterns: RegExp[] }[] = [
 ];
 
 /**
- * Map input headers/rows to standard 5+1 columns.
+ * Map input headers/rows to standard columns matching QUOTE_SCHEMA.
  */
 export function mapColumns(
   headers: string[],
@@ -107,7 +103,6 @@ export function mapColumns(
     currency: -1,
   };
 
-  // ── Match headers ──
   const matchedTargets = new Set<string>();
 
   for (let i = 0; i < headers.length; i++) {
@@ -127,18 +122,18 @@ export function mapColumns(
     }
   }
 
-  // ── Warnings for unmapped columns ──
+  // Warnings for unmapped columns
   for (let i = 0; i < headers.length; i++) {
     if (!Object.values(columnIndices).includes(i)) {
       warnings.push({
         row: 0,
         column: headers[i],
-        message: `Column "${headers[i]}" was not mapped to any standard column. Data preserved in "Other Info".`,
+        message: `Column "${headers[i]}" was not mapped. Data preserved in "other_info".`,
       });
     }
   }
 
-  // ── Transform rows ──
+  // Transform rows
   const mappedRows = rows.map((row, rowIdx) => {
     const mapped: Record<string, string> = {};
 
@@ -146,32 +141,31 @@ export function mapColumns(
       mapped[col] = '';
     }
 
-    // Extract standard columns
     const getValue = (idx: number) => (idx >= 0 && idx < row.length ? row[idx].trim() : '');
-    mapped['Product Name'] = getValue(columnIndices.productName);
-    mapped['Specification'] = getValue(columnIndices.spec);
-    mapped['Unit Price'] = getValue(columnIndices.unitPrice);
-    mapped['MOQ'] = getValue(columnIndices.moq);
-    mapped['Currency'] = getValue(columnIndices.currency);
+    mapped['description'] = getValue(columnIndices.productName);
+    mapped['model'] = getValue(columnIndices.spec);
+    mapped['unit_price'] = getValue(columnIndices.unitPrice);
+    mapped['quantity'] = getValue(columnIndices.moq);
+    mapped['currency'] = getValue(columnIndices.currency);
 
-    // ── Warning: unparseable price ──
-    const priceStr = mapped['Unit Price'];
+    // Warning: unparseable price
+    const priceStr = mapped['unit_price'];
     if (priceStr && isNaN(Number(priceStr.replace(/[$,€£¥]/g, '')))) {
       warnings.push({
         row: rowIdx,
-        column: 'Unit Price',
+        column: 'unit_price',
         message: `Unable to parse price value: "${priceStr}".`,
       });
     }
 
-    // Collect other values as "Other Info"
+    // Collect other values as "other_info"
     const other: string[] = [];
     for (let i = 0; i < row.length; i++) {
       if (!Object.values(columnIndices).includes(i) && row[i].trim()) {
         other.push(`${headers[i]}: ${row[i].trim()}`);
       }
     }
-    mapped['Other Info'] = other.join('; ');
+    mapped['other_info'] = other.join('; ');
 
     return mapped;
   });
@@ -185,11 +179,11 @@ export function mapColumns(
 
 function getColumnKey(target: string): string | null {
   const map: Record<string, string> = {
-    'Product Name': 'productName',
-    'Specification': 'spec',
-    'Unit Price': 'unitPrice',
-    'MOQ': 'moq',
-    'Currency': 'currency',
+    'description': 'productName',
+    'model': 'spec',
+    'unit_price': 'unitPrice',
+    'quantity': 'moq',
+    'currency': 'currency',
   };
   return map[target] || null;
 }

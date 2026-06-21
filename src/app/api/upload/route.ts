@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
     // ── Response ──
     return NextResponse.json({
       success: true,
-      columns: ['Product Name', 'Specification', 'Unit Price', 'MOQ', 'Currency', 'Other Info'],
+      columns: ['description', 'model', 'unit_price', 'quantity', 'currency', 'other_info'],
       rows,
       warnings,
       csv,

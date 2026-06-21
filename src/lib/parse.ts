@@ -192,26 +192,24 @@ function mapExtractResult(
   if (!Array.isArray(details) || details.length === 0) return null;
 
   const headers = [
-    'Product Name',
-    'Specification',
-    'Unit Price',
-    'MOQ',
-    'Currency',
-    'Other Info',
+    'description',
+    'model',
+    'unit_price',
+    'quantity',
+    'currency',
+    'other_info',
   ];
 
   const rows = details.map((item: unknown) => {
     const row = item as Record<string, unknown>;
-    const description = String(row.description ?? '');
-    const model = row.model ? String(row.model) : '';
 
     return [
-      description,                          // Product Name
-      model,                                // Specification
-      String(row.unit_price ?? ''),         // Unit Price
-      String(row.quantity ?? ''),           // MOQ
-      String(row.currency ?? 'USD'),        // Currency
-      `Unit: ${row.unit || ''}; Amount: ${row.amount || ''}`,  // Other Info
+      String(row.description ?? ''),
+      row.model ? String(row.model) : '',
+      String(row.unit_price ?? ''),
+      String(row.quantity ?? ''),
+      String(row.currency ?? 'USD'),
+      `unit: ${row.unit || ''}; amount: ${row.amount || ''}`,
     ];
   });
 
