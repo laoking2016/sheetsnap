@@ -150,17 +150,6 @@ export async function parseFile(
       );
     }
 
-    // Debug: log extract result structure
-    const er = job.extract_result;
-    console.log('[parse] extract_result isArray:', Array.isArray(er));
-    if (er && typeof er === 'object') {
-      console.log('[parse] extract_result keys:', Object.keys(er as object));
-      if (Array.isArray(er) && er.length > 0) {
-        console.log('[parse] first item keys:', Object.keys(er[0] as object));
-        console.log('[parse] first item:', JSON.stringify(er[0], null, 2));
-      }
-    }
-
     // Step 4: Map extracted data to standard rows
     return mapExtractResult(job.extract_result);
   } catch (err) {
@@ -190,15 +179,9 @@ function mapExtractResult(
 ): ParseResult | null {
   if (!extractResult || typeof extractResult !== 'object') return null;
 
-  // extraction_target: 'per_table_row' returns an array of objects
-  let details: unknown[];
-
-  if (Array.isArray(extractResult)) {
-    details = extractResult;
-  } else {
-    const obj = extractResult as Record<string, unknown>;
-    details = (obj.product_details ?? []) as unknown[];
-  }
+  // The Extract API returns { product_details: [...] } matching QUOTE_SCHEMA
+  const obj = extractResult as Record<string, unknown>;
+  const details = obj.product_details as unknown[] | undefined;
 
   if (!Array.isArray(details) || details.length === 0) return null;
 
