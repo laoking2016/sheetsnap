@@ -5,6 +5,7 @@ export interface ColumnMappingResult {
     unitPrice: number;
     moq: number;
     currency: number;
+    amount: number;
   };
   rows: Record<string, string>[];
   warnings: { row: number; column: string; message: string }[];
@@ -85,6 +86,15 @@ const COLUMN_PATTERNS: { target: string; patterns: RegExp[] }[] = [
       /币种/i,
     ],
   },
+  {
+    target: 'amount',
+    patterns: [
+      /amount/i,
+      /total/i,
+      /金额/i,
+      /总计/i,
+    ],
+  },
 ];
 
 /**
@@ -101,6 +111,7 @@ export function mapColumns(
     unitPrice: -1,
     moq: -1,
     currency: -1,
+    amount: -1,
   };
 
   const matchedTargets = new Set<string>();
@@ -147,7 +158,7 @@ export function mapColumns(
     mapped['unit_price'] = getValue(columnIndices.unitPrice);
     mapped['quantity'] = getValue(columnIndices.moq);
     mapped['currency'] = getValue(columnIndices.currency);
-    mapped['amount'] = '';
+    mapped['amount'] = getValue(columnIndices.amount);
 
     // Warning: unparseable price
     const priceStr = mapped['unit_price'];
@@ -176,6 +187,7 @@ function getColumnKey(target: string): string | null {
     'unit_price': 'unitPrice',
     'quantity': 'moq',
     'currency': 'currency',
+    'amount': 'amount',
   };
   return map[target] || null;
 }
