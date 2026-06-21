@@ -7,12 +7,86 @@ export interface ParseResult {
 }
 
 /**
- * Parse an uploaded file using LlamaParse.
+ * Quote data schema for structured extraction.
+ * Extracts each product row as a structured object.
+ */
+const QUOTE_SCHEMA = {
+  type: 'object',
+  properties: {
+    product_details: {
+      description: 'A list of products or services included in the quotation.',
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          item_no: {
+            description: 'The sequential number of the item in the list.',
+            type: 'integer',
+          },
+          description: {
+            description:
+              'A detailed description of the product, including specifications.',
+            type: 'string',
+          },
+          model: {
+            description:
+              'The model number or specific identifier of the product, if available.',
+            anyOf: [
+              { description: 'The model number of the product.', type: 'string' },
+              { type: 'null' },
+            ],
+          },
+          quantity: {
+            description:
+              'The number of units quoted for this item (MOQ if specified).',
+            type: 'integer',
+          },
+          unit: {
+            description:
+              'The unit of measurement for the quantity, e.g., pcs, sets, boxes.',
+            type: 'string',
+          },
+          unit_price: {
+            description:
+              'The price per unit of the item. Numeric value only, without currency symbol.',
+            type: 'number',
+          },
+          amount: {
+            description:
+              'The total amount for this item (Quantity x Unit Price).',
+            type: 'number',
+          },
+          currency: {
+            description:
+              'The currency of the prices, e.g., USD, CNY, EUR. Detect from context.',
+            type: 'string',
+          },
+        },
+        required: [
+          'item_no',
+          'description',
+          'quantity',
+          'unit',
+          'unit_price',
+          'amount',
+          'currency',
+        ],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['product_details'],
+  additionalProperties: false,
+};
+
+/**
+ * Parse an uploaded file using LlamaCloud Extract API.
  *
  * Pipeline:
- *   1. LlamaParse (with English parsing instruction) → markdown + structured items
- *   2. Extract table data from structured items or markdown
- *   3. Return raw rows for column mapping → CSV
+ *   1. Upload file → client.files.create()
+ *   2. Submit extract job with JSON Schema → client.extract.create()
+ *   3. Poll until COMPLETED → client.extract.get()
+ *   4. Map extracted rows to standard columns
  *
  * CSV files are parsed locally.
  */
@@ -23,12 +97,12 @@ export async function parseFile(
   const ext = fileName.split('.').pop()?.toLowerCase();
   const isDev = process.env.NODE_ENV === 'development';
 
-  // CSV: parse directly (no AI needed)
+  // CSV: parse directly
   if (ext === 'csv') {
     return parseCsv(buffer);
   }
 
-  // Excel/PDF: use LlamaParse with English parsing instruction
+  // Excel/PDF: use LlamaCloud Extract API
   if (!process.env.LLAMA_PARSE_API_KEY) {
     if (isDev) {
       console.warn('[parse] LLAMA_PARSE_API_KEY not set, using mock');
@@ -40,52 +114,44 @@ export async function parseFile(
   try {
     const client = new LlamaCloud();
 
-    // ── Step 1: Parse with custom English instruction ──
-    const result = await client.parsing.parse(
-      {
-        tier: 'agentic',
-        version: 'latest',
-        upload_file: await toFile(new Uint8Array(buffer), fileName, {
-          type: 'application/octet-stream',
-        }),
-        expand: ['markdown_full', 'items'],
-        agentic_options: {
-          custom_prompt: [
-            // Instruction: what to extract
-            'Extract the product quotation table from this document.',
-            '',
-            'Rules:',
-            '- Output the table in markdown format with pipe-separated columns.',
-            '- The table MUST include these columns in this exact order:',
-            '  1. Product Name (e.g. "LED Bulb 12W")',
-            '  2. Specification (e.g. "E27 220V 6000K")',
-            '  3. Unit Price (numeric value only, e.g. "2.50")',
-            '  4. MOQ — Minimum Order Quantity (e.g. "100")',
-            '  5. Currency (e.g. "USD", "CNY", "EUR")',
-            '- If a column is missing from the source, leave it blank.',
-            '- Skip header rows, title lines, logos, and company info.',
-            '- Only output rows that contain actual product data.',
-            '- Keep numbers as-is (do not add or remove decimal places).',
-            '- Detect and preserve the currency from context.',
-          ].join('\n'),
-        },
-      },
-      { verbose: false, timeout: 120_000 },
-    );
+    // Step 1: Upload file
+    const fileObj = await client.files.create({
+      file: await toFile(new Uint8Array(buffer), fileName, {
+        type: 'application/octet-stream',
+      }),
+      purpose: 'extract',
+    });
 
-    // ── Step 2: Extract table from structured items (preferred) or markdown ──
-    const tableRows = extractTableFromItems(result.items);
-    if (tableRows) {
-      return tableRows;
+    // Step 2: Submit extract job with JSON Schema
+    let job = await client.extract.create({
+      file_input: fileObj.id,
+      configuration: {
+        data_schema: QUOTE_SCHEMA,
+        tier: 'cost_effective',
+        extraction_target: 'per_table_row',
+        parse_tier: 'cost_effective',
+        cite_sources: true,
+        confidence_scores: true,
+      },
+    });
+
+    // Step 3: Poll until terminal state
+    const terminalStates = ['COMPLETED', 'FAILED', 'CANCELLED'];
+    while (!terminalStates.includes(job.status)) {
+      await new Promise((r) => setTimeout(r, 1500));
+      job = await client.extract.get(job.id);
     }
 
-    // Fallback: extract from markdown
-    const markdown = result.markdown_full || '';
-    if (!markdown) return null;
+    if (job.status !== 'COMPLETED') {
+      throw new Error(
+        `Extract job ${job.id} failed: ${job.error_message || 'unknown error'}`,
+      );
+    }
 
-    return extractTableFromMarkdown(markdown);
+    // Step 4: Map extracted data to standard rows
+    return mapExtractResult(job.extract_result);
   } catch (err) {
-    console.error('[parse] LlamaParse error:', err);
+    console.error('[parse] Extract error:', err);
     if (isDev) {
       console.warn('[parse] falling back to mock (dev only)');
       return mockParse();
@@ -95,97 +161,46 @@ export async function parseFile(
 }
 
 /**
- * Extract table data from structured items (expand: ['items']).
+ * Map the structured extract result to our standard column format.
  */
-function extractTableFromItems(
-  items: unknown,
+function mapExtractResult(
+  extractResult: unknown,
 ): ParseResult | null {
-  if (!items || typeof items !== 'object') return null;
-  const obj = items as Record<string, unknown>;
-  const pages = obj?.pages;
-  if (!Array.isArray(pages) || pages.length === 0) return null;
+  if (!extractResult || typeof extractResult !== 'object') return null;
 
-  const allRows: string[][] = [];
-  let headers: string[] = [];
-  let foundHeaders = false;
+  const result = extractResult as Record<string, unknown>;
+  const details = result.product_details;
+  if (!Array.isArray(details) || details.length === 0) return null;
 
-  for (const page of pages) {
-    const pageObj = page as Record<string, unknown>;
-    if (pageObj?.success === false) continue;
-    const pageItems = pageObj?.items;
-    if (!Array.isArray(pageItems)) continue;
+  const headers = [
+    'Product Name',
+    'Specification',
+    'Unit Price',
+    'MOQ',
+    'Currency',
+    'Other Info',
+  ];
 
-    for (const item of pageItems) {
-      const table = item as Record<string, unknown>;
-      if (table?.type !== 'table') continue;
-      const rows = table?.rows;
-      if (!Array.isArray(rows) || rows.length === 0) continue;
+  const rows = details.map((item: unknown) => {
+    const row = item as Record<string, unknown>;
+    const description = String(row.description ?? '');
+    const model = row.model ? String(row.model) : '';
 
-      const tableRows = rows as Array<Array<string | number | null>>;
+    // Combine description and model as product name / spec
+    const productName = model ? `${description} (${model})` : description;
+    const spec = model ? description : '';
 
-      if (!foundHeaders && tableRows.length > 0) {
-        const firstRow = tableRows[0] || [];
-        headers = firstRow.map((c) => String(c ?? ''));
-        const hasNumbers = headers.some((h) => !isNaN(Number(h)));
-        if (!hasNumbers) {
-          foundHeaders = true;
-          tableRows.shift();
-        } else {
-          headers = headers.map((_, i) => `Column ${i + 1}`);
-        }
-      }
+    return [
+      productName,
+      spec,
+      String(row.unit_price ?? ''),
+      String(row.quantity ?? ''),
+      String(row.currency ?? ''),
+      `Unit: ${row.unit || ''}; Amount: ${row.amount || ''}`,
+    ];
+  });
 
-      for (const row of tableRows) {
-        const strRow = (row || []).map((c) => String(c ?? ''));
-        if (strRow.some((c) => c.trim())) {
-          allRows.push(strRow);
-        }
-      }
-    }
-  }
-
-  if (allRows.length === 0) return null;
-  if (headers.length === 0 && allRows.length > 0) {
-    headers = allRows[0].map((_, i) => `Column ${i + 1}`);
-  }
-
-  return { headers, rows: allRows };
-}
-
-/**
- * Extract table from markdown output (pipe tables).
- */
-function extractTableFromMarkdown(markdown: string): ParseResult | null {
-  const lines = markdown.split('\n');
-  const tableLines: string[] = [];
-  let inTable = false;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
-      inTable = true;
-      if (!/^[\s|:-]+$/.test(trimmed.replace(/\|/g, ''))) {
-        tableLines.push(trimmed);
-      }
-    } else if (inTable && trimmed === '') {
-      break;
-    }
-  }
-
-  if (tableLines.length < 2) return null;
-
-  const headers = parseRow(tableLines[0]);
-  const rows = tableLines.slice(1).map(parseRow);
-  const nonEmptyRows = rows.filter((r) => r.some((cell) => cell.trim() !== ''));
-
-  return { headers, rows: nonEmptyRows, raw: markdown };
-}
-
-function parseRow(line: string): string[] {
-  return line
-    .split('|')
-    .slice(1, -1)
-    .map((cell) => cell.trim());
+  return { headers, rows };
 }
 
 /**
@@ -193,10 +208,15 @@ function parseRow(line: string): string[] {
  */
 function parseCsv(buffer: Buffer): ParseResult | null {
   const text = buffer.toString('utf-8');
-  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  const lines = text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
   if (lines.length < 2) return null;
 
-  const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
+  const headers = lines[0]
+    .split(',')
+    .map((h) => h.trim().replace(/^"|"$/g, ''));
   const rows = lines.slice(1).map((line) =>
     parseCsvLine(line).map((cell) => cell.trim()),
   );
@@ -233,11 +253,10 @@ function parseCsvLine(line: string): string[] {
 
 function mockParse(): ParseResult | null {
   return {
-    headers: ['Product Name', 'Specification', 'Unit Price', 'MOQ', 'Currency'],
+    headers: ['Product Name', 'Specification', 'Unit Price', 'MOQ', 'Currency', 'Other Info'],
     rows: [
-      ['LED Bulb 12W', 'E27 220V 6000K', '2.50', '100', 'USD'],
-      ['LED Bulb 9W', 'E27 220V 4000K', '1.80', '200', 'USD'],
-      ['LED Strip 5m', 'RGB 5050 12V', '8.90', '50', 'USD'],
+      ['LED Bulb 12W', 'E27 220V 6000K', '2.50', '100', 'USD', 'Unit: pcs; Amount: 250.00'],
+      ['LED Bulb 9W', 'E27 220V 4000K', '1.80', '200', 'USD', 'Unit: pcs; Amount: 360.00'],
     ],
   };
 }
