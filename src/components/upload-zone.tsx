@@ -220,7 +220,7 @@ export function UploadZone({ isLoggedIn }: UploadZoneProps) {
 
   if (stage === 'preview' && result) {
     return (
-      <div className="flex w-full max-w-5xl flex-col items-center gap-4">
+      <div className="flex w-full max-w-6xl flex-col items-center gap-4">
         {showEmailDialog && !guestEmail ? (
           <GuestEmailDialog onEmailSubmit={handleEmailSubmit} onSkip={handleSkip} />
         ) : (
