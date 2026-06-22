@@ -22,12 +22,12 @@ export default async function Home() {
       {/* Hero */}
       <main className="flex flex-1 flex-col items-center gap-12 px-4 py-16 text-center sm:py-24">
         <div className="max-w-2xl space-y-6">
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+          <h1 className="text-5xl font-bold tracking-tight sm:text-7xl">
             Turn supplier quotes into
             <br />
             <span className="text-primary">clean CSV in seconds</span>
           </h1>
-          <p className="text-lg text-muted-foreground sm:text-xl">
+          <p className="text-base text-muted-foreground sm:text-lg">
             Stop manually typing data from Excel and PDF quotation files.
             Sheetsnap extracts the numbers you need into a ready-to-use spreadsheet.
           </p>
