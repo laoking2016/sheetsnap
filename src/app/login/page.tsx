@@ -1,21 +1,15 @@
 'use client';
 
 import { signIn, useSession } from 'next-auth/react';
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
 
 export default function LoginPage() {
   const { status } = useSession();
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [isSending, setIsSending] = useState(false);
 
-  // Already logged in → redirect home
   useEffect(() => {
     if (status === 'authenticated') {
       router.push('/');
@@ -23,22 +17,8 @@ export default function LoginPage() {
   }, [status, router]);
 
   if (status === 'loading' || status === 'authenticated') {
-    return null; // nothing to render while redirecting
+    return null;
   }
-
-  const handleMagicLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
-    setIsSending(true);
-    try {
-      await signIn('email', { email, redirect: false });
-      toast.success('Magic link sent! Check your inbox.');
-    } catch {
-      toast.error('Failed to send magic link. Try again.');
-    } finally {
-      setIsSending(false);
-    }
-  };
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
@@ -47,7 +27,7 @@ export default function LoginPage() {
           <CardTitle className="text-2xl">Welcome to Sheetsnap</CardTitle>
           <CardDescription>Sign in to track your parsing history and manage your account.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           <Button variant="default" className="w-full" onClick={() => signIn('google', { redirectTo: '/' })}>
             <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
               <path
@@ -69,32 +49,6 @@ export default function LoginPage() {
             </svg>
             Sign in with Google
           </Button>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">Or continue with email</span>
-            </div>
-          </div>
-
-          <form onSubmit={handleMagicLink} className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="email">Email address</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={isSending}>
-              {isSending ? 'Sending…' : 'Send Magic Link'}
-            </Button>
-          </form>
         </CardContent>
       </Card>
     </div>
