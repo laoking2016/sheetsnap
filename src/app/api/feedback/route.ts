@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { auth } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,11 +12,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get current user if logged in
-    const session = await auth();
-    const userId = session?.user?.id || null;
-
     // Write to Supabase feedback table
+    // Note: user_id FK references public.users, but actual users are in next_auth schema.
+    // We skip user_id and use email for identity instead.
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -25,7 +22,6 @@ export async function POST(request: NextRequest) {
     );
 
     const { error } = await supabase.from('feedback').insert({
-      user_id: userId,
       email: email || null,
       message,
       rating: rating || null,
