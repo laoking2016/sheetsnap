@@ -7,6 +7,11 @@ import { Button } from '@/components/ui/button';
 import { GuestEmailDialog } from '@/components/guest-email-dialog';
 import { getGuestId } from '@/lib/guest-id';
 
+const NUMERIC_COLUMNS = ['unit_price', 'quantity', 'amount'];
+function isNumeric(col: string) {
+  return NUMERIC_COLUMNS.includes(col);
+}
+
 function track(event: string, metadata?: Record<string, unknown>) {
   fetch('/api/analytics', {
     method: 'POST',
@@ -227,11 +232,13 @@ export function UploadZone({ isLoggedIn }: UploadZoneProps) {
           <>
             {/* Preview table */}
             <div className="w-full overflow-x-auto rounded-lg border">
-              <table className="w-full text-left text-sm">
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
                     {result.columns.map((col) => (
-                      <th key={col} className="px-3 py-2 font-medium">{col}</th>
+                      <th key={col} className={`px-3 py-2 font-medium ${isNumeric(col) ? 'text-right' : 'text-left'}`}>
+                        {col}
+                      </th>
                     ))}
                   </tr>
                 </thead>
@@ -244,7 +251,7 @@ export function UploadZone({ isLoggedIn }: UploadZoneProps) {
                           (w) => w.row === i && w.column === col,
                         );
                         return (
-                          <td key={col} className="truncate px-3 py-2">
+                          <td key={col} className={`truncate px-3 py-2 ${isNumeric(col) ? 'text-right' : 'text-left'}`}>
                             {hasWarning ? (
                               <span className="inline-flex items-center gap-1" title={val}>
                                 <span className="inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-amber-100 text-[10px] text-amber-700">
