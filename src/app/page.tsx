@@ -22,7 +22,7 @@ export default async function Home() {
       {/* Hero */}
       <main className="flex flex-1 flex-col items-center gap-12 px-4 py-16 text-center sm:py-24">
         <div className="max-w-2xl space-y-6">
-          <h1 className="text-5xl font-bold tracking-tight sm:text-7xl">
+          <h1 className="text-5xl font-bold tracking-tight sm:text-5xl">
             Turn supplier quotes into
             <br />
             <span className="text-primary">clean CSV in seconds</span>
