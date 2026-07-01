@@ -127,18 +127,16 @@ export async function parseFile(
       file_input: fileObj.id,
       configuration: {
         data_schema: QUOTE_SCHEMA,
-        tier: 'cost_effective',
+        tier: 'fast',
         extraction_target: 'per_table_row',
-        parse_tier: 'cost_effective',
-        cite_sources: true,
-        confidence_scores: true,
+        parse_tier: 'fast',
       },
     });
 
     // Step 3: Poll until terminal state
     const terminalStates = ['COMPLETED', 'FAILED', 'CANCELLED'];
     while (!terminalStates.includes(job.status)) {
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, 800));
       job = await client.extract.get(job.id, {
         expand: ['extract_metadata'],
       });
