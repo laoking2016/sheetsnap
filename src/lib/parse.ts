@@ -129,7 +129,7 @@ export async function parseFile(
         data_schema: QUOTE_SCHEMA,
         tier: 'cost_effective',
         extraction_target: 'per_table_row',
-        parse_tier: 'cost_effective',
+        parse_tier: 'fast',
       },
     });
 
